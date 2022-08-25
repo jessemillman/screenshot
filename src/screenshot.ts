@@ -27,6 +27,8 @@ import { gotScraping } from 'got-scraping';
   const browser = await puppeteer.launch({
     defaultViewport: { width: 1920, height: 1080 }, // set browser size (this is the default for testing)
   });
+
+  const screenshotPath = "cryptoslam - " + date + ".png"
   // selectors
   const tableSelector =
     "#sales-rankings-24h > div > div.sales-ranking-period__top-sales > div:nth-child(4) > table";
@@ -41,42 +43,53 @@ import { gotScraping } from 'got-scraping';
   const thirtyDayTableSelector =
     "#sales-rankings-30d > div > div.sales-ranking-period__top-sales > div:nth-child(4) > table tr";
   const dailySelector = "#table tr"
-
   const url = "https://cryptoslam.io"
   const dailyUrl = url + "/immutablex/?month=" + date.substring(0, 7);
   
+  console.log("Opening cryptoslam...")
   const page = await browser.newPage();
   await page.goto(url); // load the url
   const table = await page.$(tableSelector); // get the table
   await table?.screenshot({
-    path: "cryptoslam - " + date + ".png",
+    path: screenshotPath,
   });
+  console.log("Screenshot saved to: ./" + screenshotPath)
 
   // select day 1
+  console.log("Getting 24hr data...")
   let day = await getTableData(page, dayTableSelector, "24hr");
 
   // select day 7
   await page.click(sevenDaySelector);
   await delay(2000);
+  console.log("Getting 7d data...")
   let sevenDay = await getTableData(page, sevenDayTableSelector, "7 day");
 
   // select day 30
   await page.click(thirtyDaySelector);
   await delay(2000);
+  console.log("Getting 30d data...")
   let thirtyDay = await getTableData(page, thirtyDayTableSelector, "30 day");
   
   await page.goto(dailyUrl); // load the daily summary url
+  console.log("Getting daily summary data (this takes 10s)...")
   await delay(10000); // wait 10s as this page is shit
   const daily =  await getDailyTableData(page, dailySelector);
   let dailyTradeVolume = daily[daily.length - 2][2]
   let dailyTradeDate = daily[daily.length - 2][1]
-  
+  console.log("")
+  console.log("Cryptoslam data retrieved")
+  console.log("")
+
   // print your updates
   console.log(day);
   console.log(sevenDay);
   console.log(thirtyDay);
   console.log("Daily trading page: " + dailyTradeVolume + " on " + dailyTradeDate)
   
+  console.log("")
+  
+  console.log("Getting Immutascan data...")
   const data: any = await gotScraping('https://3vkyshzozjep5ciwsh2fvgdxwy.appsync-api.us-west-2.amazonaws.com/graphql', {
     // we are expecting a JSON response back
     responseType: 'json',
@@ -86,9 +99,12 @@ import { gotScraping } from 'got-scraping';
     headers: { 'x-api-key': "da2-ihd6lsinwbdb3e6c6ocfkab2nm", 'Content-Type': 'application/json' },
     // here is our query with our variables
     body: JSON.stringify({ query: GET_LATEST.loc?.source.body, variables }),
+}).catch(function(e) {
+  console.log('promise rejected')
 });
-  let immutascanTradeVolume = data.body["data"]["getMetricsAll"]["items"][2]["trade_volume_usd"];
-  let immutascanTradeDate = data.body["data"]["getMetricsAll"]["items"][2]["type"];
+  // get the item at index[1] so its the second latest (i.e. yesterday)
+  let immutascanTradeVolume = data.body["data"]["getMetricsAll"]["items"][1]["trade_volume_usd"];
+  let immutascanTradeDate = data.body["data"]["getMetricsAll"]["items"][1]["type"];
   console.log("Immutascan trade volume: " + immutascanTradeVolume + " on: " + immutascanTradeDate)
   await page.close();
   await browser.close();  
