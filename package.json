@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "got-scraping": "^3.2.10",
+    "graphql-tag": "^2.12.6",
+    "puppeteer": "^16.1.0"
+  },
+  "devDependencies": {
+    "@types/puppeteer": "^5.4.6",
+    "got-scraping": "^3.2.10",
+    "graphql-tag": "^2.12.6"
+  },
+  "scripts": {
+    "screenshot": "ts-node ./src/screenshot.ts"
+  }
+}
