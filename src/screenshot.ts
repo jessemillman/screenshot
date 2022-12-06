@@ -37,11 +37,7 @@ import { gotScraping } from 'got-scraping';
 
   const date = now.toISOString().split("T")[0]; // get a path-safe date
   var lastmonthdate = new Date();
-  //console.log('Last month 1-' + lastmonthdate)
   lastmonthdate.setDate(1);
-  //console.log('Last month 2-' + lastmonthdate)
-  //lastmonthdate.setMonth(lastmonthdate.getMonth()-1);
-  //console.log('Last month 3-' + lastmonthdate)
   let lastmonthdatestring = lastmonthdate.toISOString().split("T")[0];
   console.log('Lastmonth Date ' + lastmonthdatestring)
   console.log('Date ' + date)
@@ -51,11 +47,9 @@ import { gotScraping } from 'got-scraping';
     console.log('Change month ' + lastmonthdate)
     lastmonthdatestring = lastmonthdate.toISOString().split("T")[0];
   }
-  //console.log('Last month 4-' + lastmonthdate.toISOString())
-  //console.log('Last month 5-' + lastmonthdatestring)
-  //const datetime = now.toISOString()
   const browser = await puppeteer.launch({
     defaultViewport: { width: 1920, height: 1080 }, // set browser size (this is the default for testing)
+    //Uncomment if you need to visually see what puppeteer is doing
     //headless:false,
     //slowMo: 200
   });
@@ -83,11 +77,8 @@ import { gotScraping } from 'got-scraping';
   const dailySelector = "tr"
   const url = "https://www.cryptoslam.io"
   const thisMonthDailyUrl = url + "/blockchains/immutablex?month=" + date.substring(0, 7);
- // console.log('Last month 6-' + lastmonthdatestring.substring(0, 7))
   const lastMonthDailyUrl = url + "/blockchains/immutablex?month=" + lastmonthdatestring.substring(0, 7);
   
-  //console.log('Last month 7-' + lastMonthDailyUrl)
-
   console.log("Opening cryptoslam...")
   const page = await browser.newPage();
   console.log('Opening page: ' + url)
@@ -104,7 +95,7 @@ import { gotScraping } from 'got-scraping';
   await page.waitForNavigation({
     waitUntil: 'load',
   });
-*/
+  */
 
   console.log("Get specific protocol ranking table on the page...")
   const table = await page.$(tableSelector); // get the table
@@ -118,54 +109,69 @@ import { gotScraping } from 'got-scraping';
   console.log("Getting Cryptoslam data...")
 
   console.log('Opening page: ' + thisMonthDailyUrl)
-  await page.goto(thisMonthDailyUrl); // load the daily summary url
-  console.log("Getting daily summary data (this takes 5s)...")
-  await delay(5000); // wait 10s as this page is shit
-  let daily =  await getDailyTableData(page, dailySelector)
-  //console.log ('Number of rows - ' + daily.length)
-  //console.table(daily)
+  let daily
+  try {
+    await page.goto(thisMonthDailyUrl); // load the daily summary url
+    console.log("Getting daily summary data (this takes 5s)...")
+    await delay(5000); // wait 5s as this page is shit
+  
+    daily =  await getDailyTableData(page, dailySelector)
+    daily = daily.filter((item) => item[0]);
+    if (daily.length==0) throw Error
+
+  } catch (e)
+  {
+    //try again but wait 10s this time
+    console.log("Failed to fetch the first time so trying again (this takes 5s)...")
+    await delay(10000); // wait 10s as this page is shit
+  
+    daily =  await getDailyTableData(page, dailySelector)
+
+  }
+ 
+  //remove blank lines
   daily = daily.filter((item) => item[0]);
-  //daily = daily.filter((item) => {
-  //  return item[0] !=null && item[0] !='';
-  //})
-  console.table(daily)
+  //console.table(daily)
+
+  //make sure we have enough data to make 30 day aggregate otherwise go get last month
   if (daily.length < 30) {
     console.log("Getting daily summary data from last month since we don't have enough data (this takes 5s)...")
     console.log('Opening page: ' + lastMonthDailyUrl)
     await page.goto(lastMonthDailyUrl); // load the daily summary url
-    await delay(5000); // wait 10s as this page is shit
+    console.log("Getting daily summary data (this takes 5s)...")
+    await delay(5000); // wait 5s as this page is shit
     daily = daily.concat(await getDailyTableData(page, dailySelector)).filter((item) => item[0]);
     daily = daily.filter((item) => item[0])
     //console.table(daily)
   } 
+  console.table(daily)
 
+  if (daily.length<30) {
+    console.log("Not enough data for 30 day aggregate. Something has gone wrong loading the page")
+    return
+  }
+  
   //last 24 hours data
   let c_dailyTradeBuyers = daily[0][2];
   let c_dailyTradeTransactions = daily[0][4];
-  let c_dailyTradeVolume = daily[0][1];
+  let c_dailyTradeVolume = Number(daily[0][1].replace(/[^0-9.-]+/g, ''));
   let c_dailyTradeDate = daily[0][0];
+
+  // print the daily data
+  console.log("Cryptoslam - Daily trading data: " + formatterCurrency.format(c_dailyTradeVolume)
+  + " with " + c_dailyTradeBuyers 
+  + " buyers across "  + c_dailyTradeTransactions
+  + " trades on " + c_dailyTradeDate);
   
-
-  /*
-  //7 day data from daily data
-  const sevendaydaily = daily.slice(0,7)
-  console.table(sevendaydaily)
-
-  let c_sevendayTradeVolume = daily.slice(0,7).reduce((previous, current)=> previous+Number(current[1].replace(/[^0-9.-]+/g, '')),0);
-  console.log ('Cryptoslam - 7 Day data: Trade volume - ' + formatterCurrency.format(c_sevendayTradeVolume))
-  let c_sevendayTradeTrades = daily.slice(0,7).reduce((previous, current)=> previous+Number(current[4].replace(/[^0-9.-]+/g, '')),0);
-  console.log ('Cryptoslam - 7 Day data: Number of trades - ' + formatterLargeNumber.format(c_sevendayTradeTrades))
-  */
   //7 day data from table
 
-  const page7day = await browser.newPage();
   console.log('Opening page: ' + url)
-  await page7day.goto(url);
+  await page.goto(url);
   console.log("Waiting for 1 second...")
   await delay(1000);
 
-  await page7day.click(sevenDaySelector);
-  const dataSevenDay = await  page7day.$$eval(sevenDayTableSelector, (rows) => {
+  await page.click(sevenDaySelector);
+  const dataSevenDay = await  page.$$eval(sevenDayTableSelector, (rows) => {
     return Array.from(rows, (row) => {
       const columns = row.querySelectorAll("a");
       return Array.from(columns, (column) => column.innerText.trim());
@@ -198,26 +204,29 @@ import { gotScraping } from 'got-scraping';
       {"chain": outputdataSevenDay[20].toString(), "tradevol": outputdataSevenDay[40].toString()}
     ]
   console.table(sevenDayTradingData)
+  let c_sevendayTradeVolume: number
+  try {
+    //check if IMX in the top 20 list and use the data there
+    let c_imx_sevenday = sevenDayTradingData.filter(chain=> chain.chain ==="ImmutableX")[0]
+    c_sevendayTradeVolume = Number(c_imx_sevenday.tradevol.replace(/[^0-9.-]+/g, ''))
+    console.table(c_imx_sevenday)
+  } catch(e)
+  {
+    //if not in the top 20 list then use the aggregate data from daily data
+    console.log ('ImmutableX not in the top 20 for 7 day data')
+    console.log ('Revert to daily data summary')
+    const sevendaydaily = daily.slice(0,7)
+    console.table(sevendaydaily)
 
-  let c_sevendayTradeVolume = sevenDayTradingData.filter(chain=> chain.chain ==="ImmutableX")
-  console.table(c_sevendayTradeVolume)
-  console.log ('Cryptoslam - 7 Day data: Trade volume - ' + c_sevendayTradeVolume)
+    c_sevendayTradeVolume = sevendaydaily.reduce((previous, current)=> previous+Number(current[1].replace(/[^0-9.-]+/g, '')),0);
+  }
 
-  /*
-  //30 day data from daily data
-  const tempthirtydaydaily = daily.slice(0,30)
-  console.table(tempthirtydaydaily)
-
-  let c_thirtydayTradeVolume = daily.slice(0,30).map(daydata=> Number(daydata[1].replace(/[^0-9.-]+/g, ''))).reduce((previous, current)=> previous+current,0);
-  console.log ('Cryptoslam - 30 Day data: Trade volume - ' + formatterCurrency.format(c_thirtydayTradeVolume))
-  let c_thirtydayTradeTrades = daily.slice(0,30).map(daydata=> Number(daydata[4].replace(/[^0-9.-]+/g, ''))).reduce((previous, current)=> previous+current,0);
-  console.log ('Cryptoslam - 30 Day data: Number of trades - ' + formatterLargeNumber.format(c_thirtydayTradeTrades))
-  */
+  console.log ('Cryptoslam - 7 Day data: Trade volume - ' + formatterCurrency.format(c_sevendayTradeVolume))
 
   //30 day data from table
-  await page7day.click(thirtyDaySelector);
+  await page.click(thirtyDaySelector);
   await delay(5000);
-  const dataThirtyDay = await page7day.$$eval(thirtyDayTableSelector, (rows) => {
+  const dataThirtyDay = await page.$$eval(thirtyDayTableSelector, (rows) => {
     return Array.from(rows, (row) => {
       const columns = row.querySelectorAll("a");
       return Array.from(columns, (column) => column.innerText.trim());
@@ -250,19 +259,30 @@ import { gotScraping } from 'got-scraping';
       {"chain": outputdataThirtyday[20].toString(), "tradevol": outputdataThirtyday[40].toString()}
     ]
   console.table(thirtyDayTradingData)
-  
-  let c_thirtydayTradeVolume = thirtyDayTradingData.filter(chain=> chain.chain ==="ImmutableX")
-  console.table(c_thirtydayTradeVolume)
-  console.log ('Cryptoslam - 30 Day data: Trade volume - ' + c_thirtydayTradeVolume)
 
-  // print your updates
-  console.log("Cryptoslam - Daily trading data: " + c_dailyTradeVolume 
-  + " with " + c_dailyTradeBuyers 
-  + " buyers across "  + c_dailyTradeTransactions
-  + " trades on " + c_dailyTradeDate);
-  
+  let c_thirtydayTradeVolume: number
+  try {
+    //check if IMX in the top 20 list and use the data there
+    let c_imx_thirtyday = thirtyDayTradingData.filter(chain=> chain.chain ==="ImmutableX")[0]
+    c_thirtydayTradeVolume = Number(c_imx_thirtyday.tradevol.replace(/[^0-9.-]+/g, ''))
+    console.table(c_imx_thirtyday)
+  } catch(e)
+  {
+    //if not in the top 20 list then use the aggregate data from daily data
+    console.log ('ImmutableX not in the top 20 for 30 day data')
+    console.log ('Revert to daily data summary')
+    const thirtydaydaily = daily.slice(0,30)
+    console.table(thirtydaydaily)
+
+    c_thirtydayTradeVolume = thirtydaydaily.reduce((previous, current)=> previous+Number(current[1].replace(/[^0-9.-]+/g, '')),0);
+  }
+
+  console.log ('Cryptoslam - 30 Day data: Trade volume - ' + formatterCurrency.format(c_thirtydayTradeVolume))
+    
   console.log("")
   console.log("Cryptoslam data retrieved")
+  await page.close();
+  await browser.close();  
   console.log("")
 
   console.log("");
@@ -301,23 +321,22 @@ import { gotScraping } from 'got-scraping';
     let i_thirtydayTradeTrades = data.body["data"]["getMetricsAll"]["items"].slice(2,32).reduce((previous:any, current:any)=> previous+current.trade_count,0);
     console.log ('Immutascan - 30 Day data: Number of trades - ' + formatterLargeNumber.format(i_thirtydayTradeTrades))
   
-    await page.close();
-    await browser.close();  
+    console.log("Getting Immutascan data...")
 
     console.log ('Daily summary - ' + date)
-  /*
-    let pct24hrVolume = formatterPercentage.format((Number(c_dailyTradeVolume.replace(/[^0-9.-]+/g, ''))/immutascanTradeVolume)-1)
-    let pct7dayVolume = formatterPercentage.format((Number(c_sevendayTradeVolume.replace(/[^0-9.-]+/g, ''))/i_sevendayTradeVolume)-1)
-    let pct30dayVolume = formatterPercentage.format((Number(c_thirtydayTradeVolume.replace(/[^0-9.-]+/g, ''))/i_thirtydayTradeVolume)-1)
+  
+    let pct24hrVolume = formatterPercentage.format((c_dailyTradeVolume/immutascanTradeVolume)-1)
+    let pct7dayVolume = formatterPercentage.format((c_sevendayTradeVolume/i_sevendayTradeVolume)-1)
+    let pct30dayVolume = formatterPercentage.format((c_thirtydayTradeVolume/i_thirtydayTradeVolume)-1)
 
     let tradingData: { tracker: string, date: string, tradevol24hr_usd:string, tradevol7day_usd:string, tradevol30day_usd:string}[] = 
     [
-      {"tracker": "Cryptoslam", "date":c_dailyTradeDate, "tradevol24hr_usd": c_dailyTradeVolume, "tradevol7day_usd":c_sevendayTradeVolume, "tradevol30day_usd":c_thirtydayTradeVolume},
+      {"tracker": "Cryptoslam", "date":c_dailyTradeDate, "tradevol24hr_usd": formatterCurrency.format(c_dailyTradeVolume), "tradevol7day_usd":formatterCurrency.format(c_sevendayTradeVolume), "tradevol30day_usd":formatterCurrency.format(c_thirtydayTradeVolume)},
       {"tracker": "Immutascan", "date":immutascanTradeDate, "tradevol24hr_usd": formatterCurrency.format(immutascanTradeVolume), "tradevol7day_usd":formatterCurrency.format(i_sevendayTradeVolume), "tradevol30day_usd":formatterCurrency.format(i_thirtydayTradeVolume)},
       {"tracker": "Cr/Im", "date":date, "tradevol24hr_usd": pct24hrVolume, "tradevol7day_usd":pct7dayVolume, "tradevol30day_usd":pct30dayVolume}
     ]
     console.table(tradingData);
-    */
+    
 
 
 })();
