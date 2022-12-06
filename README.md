@@ -4,7 +4,7 @@ Built to automate the cryptoslam reporting. This tool generates a screenshot of 
 
 ## Prerequisites
 
-Use node v16+, and install dependancies with `npm -i `
+Use node v16+, and install dependancies with `npm i `
 
 ## Run
 
