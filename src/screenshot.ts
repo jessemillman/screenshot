@@ -1,9 +1,10 @@
 import * as puppeteer from "puppeteer";
 import { gql } from 'graphql-tag';
-import { gotScraping } from 'got-scraping';
+import { gotScraping, MaxRedirectsError } from 'got-scraping';
 
 
 (async () => {
+  
   const GET_LATEST = gql`
   query getMetricsAll($address: String!) {
     getMetricsAll(address: $address) {
@@ -24,6 +25,8 @@ import { gotScraping } from 'got-scraping';
   const formatterCurrency = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
+    notation: "compact",
+    compactDisplay: "short"
   });
   const formatterLargeNumber = new Intl.NumberFormat('en-US')
   const formatterPercentage = new Intl.NumberFormat('en-US', {
@@ -32,6 +35,14 @@ import { gotScraping } from 'got-scraping';
     maximumFractionDigits: 2
   })
 
+  function isCurrency(element: any)
+  {
+    let regex = /(?=.*?\d)^\$?(([1-9]\d{0,2}(,\d{3})*)|\d+)?(\.\d{1,2})?$/;
+    return regex.test(element);
+  }
+
+  //console.log ('Test ' + isCurrency ("$1,199,692"))
+  
   const variables = { address: "global" }
   const now = new Date();
 
@@ -57,13 +68,13 @@ import { gotScraping } from 'got-scraping';
   const screenshotPath = "img/cryptoslam - "+ date + ".png";
   // selectors
   const tableSelector =
-    ".css-18bewgf > div:nth-child(1)";
+    ".css-18bewgf";
    const sevenDaySelector =
     "div.css-nybhst:nth-child(2) > p:nth-child(1)";
   const thirtyDaySelector =
     "div.css-nybhst:nth-child(3) > p:nth-child(1)";
   const dayTableSelector =
-    ".css-18bewgf > div:nth-child(1)";
+    ".css-18bewgf > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(2)";
   const sevenDayTableSelector =
     ".css-18bewgf > div:nth-child(1)";
   const thirtyDayTableSelector =
@@ -96,7 +107,7 @@ import { gotScraping } from 'got-scraping';
     waitUntil: 'load',
   });
   */
-
+  
   console.log("Get specific protocol ranking table on the page...")
   const table = await page.$(tableSelector); // get the table
 
@@ -150,59 +161,80 @@ import { gotScraping } from 'got-scraping';
     console.log("Not enough data for 30 day aggregate. Something has gone wrong loading the page")
     return
   }
-  
-  //last 24 hours data
-  let c_dailyTradeBuyers = daily[0][2];
-  let c_dailyTradeTransactions = daily[0][4];
-  let c_dailyTradeVolume = Number(daily[0][1].replace(/[^0-9.-]+/g, ''));
-  let c_dailyTradeDate = daily[0][0];
 
-  // print the daily data
-  console.log("Cryptoslam - Daily trading data: " + formatterCurrency.format(c_dailyTradeVolume)
-  + " with " + c_dailyTradeBuyers 
-  + " buyers across "  + c_dailyTradeTransactions
-  + " trades on " + c_dailyTradeDate);
-  
-  //7 day data from table
+  const c_today = new Date(daily[0][0])
 
   console.log('Opening page: ' + url)
   await page.goto(url);
   console.log("Waiting for 1 second...")
   await delay(1000);
 
-  await page.click(sevenDaySelector);
-  const dataSevenDay = await  page.$$eval(sevenDayTableSelector, (rows) => {
+  let datatwentyfourhr = await  page.$$eval(dayTableSelector, (rows) => {
     return Array.from(rows, (row) => {
       const columns = row.querySelectorAll("a");
       return Array.from(columns, (column) => column.innerText.trim());
     });
   });
-  const outputdataSevenDay = dataSevenDay[0].map((_, colIndex) => dataSevenDay.map(row => row[colIndex]));
-  //console.table(outputdataSevenDay)
+  datatwentyfourhr = datatwentyfourhr[0].map((_, colIndex) => datatwentyfourhr.map(row => row[colIndex]));
+  //console.table(datatwentyfourhr)
+  datatwentyfourhr = datatwentyfourhr.filter((item) => item[0]);
+  let numofeleements = datatwentyfourhr.findIndex(isCurrency)
+  console.log ('First currency value found at ' + numofeleements)
+  let twentyfourHourTradingData: { chain: string, tradevol: string}[] = []
+  let i: number = 0
+  while (i<numofeleements) {
+    twentyfourHourTradingData.push({"chain": datatwentyfourhr[i].toString(), "tradevol": datatwentyfourhr[i+numofeleements].toString()})
+    i++;
+  }
+  
+  console.table(twentyfourHourTradingData)
 
-  let sevenDayTradingData: { chain: string, tradevol: string}[] = 
-    [
-      {"chain": outputdataSevenDay[1].toString(), "tradevol": outputdataSevenDay[21].toString()},
-      {"chain": outputdataSevenDay[2].toString(), "tradevol": outputdataSevenDay[22].toString()},
-      {"chain": outputdataSevenDay[3].toString(), "tradevol": outputdataSevenDay[23].toString()},
-      {"chain": outputdataSevenDay[4].toString(), "tradevol": outputdataSevenDay[24].toString()},
-      {"chain": outputdataSevenDay[5].toString(), "tradevol": outputdataSevenDay[25].toString()},
-      {"chain": outputdataSevenDay[6].toString(), "tradevol": outputdataSevenDay[26].toString()},
-      {"chain": outputdataSevenDay[7].toString(), "tradevol": outputdataSevenDay[27].toString()},
-      {"chain": outputdataSevenDay[8].toString(), "tradevol": outputdataSevenDay[28].toString()},
-      {"chain": outputdataSevenDay[9].toString(), "tradevol": outputdataSevenDay[29].toString()},
-      {"chain": outputdataSevenDay[10].toString(), "tradevol": outputdataSevenDay[30].toString()},
-      {"chain": outputdataSevenDay[11].toString(), "tradevol": outputdataSevenDay[31].toString()},
-      {"chain": outputdataSevenDay[12].toString(), "tradevol": outputdataSevenDay[32].toString()},
-      {"chain": outputdataSevenDay[13].toString(), "tradevol": outputdataSevenDay[33].toString()},
-      {"chain": outputdataSevenDay[14].toString(), "tradevol": outputdataSevenDay[34].toString()},
-      {"chain": outputdataSevenDay[15].toString(), "tradevol": outputdataSevenDay[35].toString()},
-      {"chain": outputdataSevenDay[16].toString(), "tradevol": outputdataSevenDay[36].toString()},
-      {"chain": outputdataSevenDay[17].toString(), "tradevol": outputdataSevenDay[37].toString()},
-      {"chain": outputdataSevenDay[18].toString(), "tradevol": outputdataSevenDay[38].toString()},
-      {"chain": outputdataSevenDay[19].toString(), "tradevol": outputdataSevenDay[39].toString()},
-      {"chain": outputdataSevenDay[20].toString(), "tradevol": outputdataSevenDay[40].toString()}
-    ]
+  let c_twentyfourhourTradeVolume: number
+  try {
+    //check if IMX in the top 20 list and use the data there
+    let c_imx_twentyfourhour = twentyfourHourTradingData.filter(chain=> chain.chain ==="ImmutableX")[0]
+    c_twentyfourhourTradeVolume = Number(c_imx_twentyfourhour.tradevol.replace(/[^0-9.-]+/g, ''))
+    console.table(c_twentyfourhourTradeVolume)
+  } catch(e)
+  {
+    //if not in the top 20 list then use the aggregate data from daily data
+    console.log ('ImmutableX not in the top 20 for 24 hr data')
+    console.log ('Revert to daily data summary')
+    //c_dailyTradeBuyers = daily[0][2];
+    //c_dailyTradeTransactions = daily[0][4];
+    c_today.setDate(now.getDate())
+    if (now != c_today) {
+      console.log ('Daily data missing today')
+      c_twentyfourhourTradeVolume = 0
+    } else c_twentyfourhourTradeVolume = Number(daily[0][1].replace(/[^0-9.-]+/g, ''));
+    //c_dailyTradeDate = daily[0][0];
+  }
+
+  // print the daily data
+  console.log("Cryptoslam - Daily trading data: " + formatterCurrency.format(c_twentyfourhourTradeVolume)
+  + " trades on " + c_today.toISOString().split("T")[0]);
+  
+  //7 day data from table
+
+  await page.click(sevenDaySelector);
+  let dataSevenDay = await page.$$eval(sevenDayTableSelector, (rows) => {
+    return Array.from(rows, (row) => {
+      const columns = row.querySelectorAll("a");
+      return Array.from(columns, (column) => column.innerText.trim());
+    });
+  });
+  dataSevenDay = dataSevenDay[0].map((_, colIndex) => dataSevenDay.map(row => row[colIndex]));  
+  dataSevenDay = dataSevenDay.filter((item) => item[0]);
+  //console.table(dataSevenDay)
+
+  numofeleements = dataSevenDay.findIndex(isCurrency)
+  console.log ('First currency value found at ' + numofeleements)
+  let sevenDayTradingData: { chain: string, tradevol: string}[] = []
+  i=0;
+  while (i<numofeleements) {
+    sevenDayTradingData.push({"chain": dataSevenDay[i].toString(), "tradevol": dataSevenDay[i+numofeleements].toString()})
+    i++;
+  }
   console.table(sevenDayTradingData)
   let c_sevendayTradeVolume: number
   try {
@@ -226,38 +258,24 @@ import { gotScraping } from 'got-scraping';
   //30 day data from table
   await page.click(thirtyDaySelector);
   await delay(5000);
-  const dataThirtyDay = await page.$$eval(thirtyDayTableSelector, (rows) => {
+  let dataThirtyDay = await page.$$eval(thirtyDayTableSelector, (rows) => {
     return Array.from(rows, (row) => {
       const columns = row.querySelectorAll("a");
       return Array.from(columns, (column) => column.innerText.trim());
     });
   });
+  dataThirtyDay = dataThirtyDay[0].map((_, colIndex) => dataThirtyDay.map(row => row[colIndex]));
+  dataThirtyDay = dataThirtyDay.filter((item) => item[0]);
   //console.table(dataThirtyDay)
-  const outputdataThirtyday = dataSevenDay[0].map((_, colIndex) => dataThirtyDay.map(row => row[colIndex]));
 
-  let thirtyDayTradingData: { chain: string, tradevol: string}[] = 
-    [
-      {"chain": outputdataThirtyday[1].toString(), "tradevol": outputdataThirtyday[21].toString()},
-      {"chain": outputdataThirtyday[2].toString(), "tradevol": outputdataThirtyday[22].toString()},
-      {"chain": outputdataThirtyday[3].toString(), "tradevol": outputdataThirtyday[23].toString()},
-      {"chain": outputdataThirtyday[4].toString(), "tradevol": outputdataThirtyday[24].toString()},
-      {"chain": outputdataThirtyday[5].toString(), "tradevol": outputdataThirtyday[25].toString()},
-      {"chain": outputdataThirtyday[6].toString(), "tradevol": outputdataThirtyday[26].toString()},
-      {"chain": outputdataThirtyday[7].toString(), "tradevol": outputdataThirtyday[27].toString()},
-      {"chain": outputdataThirtyday[8].toString(), "tradevol": outputdataThirtyday[28].toString()},
-      {"chain": outputdataThirtyday[9].toString(), "tradevol": outputdataThirtyday[29].toString()},
-      {"chain": outputdataThirtyday[10].toString(), "tradevol": outputdataThirtyday[30].toString()},
-      {"chain": outputdataThirtyday[11].toString(), "tradevol": outputdataThirtyday[31].toString()},
-      {"chain": outputdataThirtyday[12].toString(), "tradevol": outputdataThirtyday[32].toString()},
-      {"chain": outputdataThirtyday[13].toString(), "tradevol": outputdataThirtyday[33].toString()},
-      {"chain": outputdataThirtyday[14].toString(), "tradevol": outputdataThirtyday[34].toString()},
-      {"chain": outputdataThirtyday[15].toString(), "tradevol": outputdataThirtyday[35].toString()},
-      {"chain": outputdataThirtyday[16].toString(), "tradevol": outputdataThirtyday[36].toString()},
-      {"chain": outputdataThirtyday[17].toString(), "tradevol": outputdataThirtyday[37].toString()},
-      {"chain": outputdataThirtyday[18].toString(), "tradevol": outputdataThirtyday[38].toString()},
-      {"chain": outputdataThirtyday[19].toString(), "tradevol": outputdataThirtyday[39].toString()},
-      {"chain": outputdataThirtyday[20].toString(), "tradevol": outputdataThirtyday[40].toString()}
-    ]
+  numofeleements = dataThirtyDay.findIndex(isCurrency)
+  console.log ('First currency value found at ' + numofeleements)
+  let thirtyDayTradingData: { chain: string, tradevol: string}[] = []
+  i=0;
+  while (i<numofeleements) {
+    thirtyDayTradingData.push({"chain": dataThirtyDay[i].toString(), "tradevol": dataThirtyDay[i+numofeleements].toString()})
+    i++;
+  }
   console.table(thirtyDayTradingData)
 
   let c_thirtydayTradeVolume: number
@@ -300,43 +318,97 @@ import { gotScraping } from 'got-scraping';
   }).catch(function(e) {
     console.log('promise rejected')
   });
-    console.log('immutascan data' + data)
-    // get the item at index[1] so its the second latest (i.e. yesterday)
-    let immutascanTradeVolume = data.body["data"]["getMetricsAll"]["items"][2]["trade_volume_usd"];
-    let immutascanTradeDate = data.body["data"]["getMetricsAll"]["items"][2]["type"];
-    console.log("Immutascan trade volume: " + formatterCurrency.format(immutascanTradeVolume) + " on: " + immutascanTradeDate)
 
-    //let temp7day = data.body["data"]["getMetricsAll"]["items"].slice(2,9)
-    //let temp30day = data.body["data"]["getMetricsAll"]["items"].slice(2,32)
-    //console.table(temp7day)
+  let posfortoday = 1
 
-    let i_sevendayTradeVolume = data.body["data"]["getMetricsAll"]["items"].slice(2,9).reduce((previous:any, current:any)=> previous+current.trade_volume_usd,0);
-    console.log ('Immutascan - 7 Day data: Volume of trades - ' + formatterCurrency.format(i_sevendayTradeVolume))
-    let i_sevendayTradeTrades = data.body["data"]["getMetricsAll"]["items"].slice(2,9).reduce((previous:any, current:any)=> previous+current.trade_count,0);
-    console.log ('Immutascan - 7 Day data: Number of trades - ' + formatterLargeNumber.format(i_sevendayTradeTrades))
+  // get the item at index[1] so its the second latest (i.e. yesterday)
+  let immutascanTradeDate = new Date(data.body["data"]["getMetricsAll"]["items"][posfortoday]["type"]);
 
-    //console.table(temp30day)
-    let i_thirtydayTradeVolume = data.body["data"]["getMetricsAll"]["items"].slice(2,32).reduce((previous:any, current:any)=> previous+current.trade_volume_usd,0);
-    console.log ('Immutascan - 30 Day data: Volume of trades - ' + formatterCurrency.format(i_thirtydayTradeVolume))
-    let i_thirtydayTradeTrades = data.body["data"]["getMetricsAll"]["items"].slice(2,32).reduce((previous:any, current:any)=> previous+current.trade_count,0);
-    console.log ('Immutascan - 30 Day data: Number of trades - ' + formatterLargeNumber.format(i_thirtydayTradeTrades))
-  
-    console.log("Getting Immutascan data...")
+  if (immutascanTradeDate==now) posfortoday +=1
 
-    console.log ('Daily summary - ' + date)
-  
-    let pct24hrVolume = formatterPercentage.format((c_dailyTradeVolume/immutascanTradeVolume)-1)
-    let pct7dayVolume = formatterPercentage.format((c_sevendayTradeVolume/i_sevendayTradeVolume)-1)
-    let pct30dayVolume = formatterPercentage.format((c_thirtydayTradeVolume/i_thirtydayTradeVolume)-1)
+  let i_twentyfourhourTradeVolume = data.body["data"]["getMetricsAll"]["items"][posfortoday]["trade_volume_usd"];
+  console.log("Immutascan trade volume: " + formatterCurrency.format(i_twentyfourhourTradeVolume) + " on: " + immutascanTradeDate)
 
-    let tradingData: { tracker: string, date: string, tradevol24hr_usd:string, tradevol7day_usd:string, tradevol30day_usd:string}[] = 
-    [
-      {"tracker": "Cryptoslam", "date":c_dailyTradeDate, "tradevol24hr_usd": formatterCurrency.format(c_dailyTradeVolume), "tradevol7day_usd":formatterCurrency.format(c_sevendayTradeVolume), "tradevol30day_usd":formatterCurrency.format(c_thirtydayTradeVolume)},
-      {"tracker": "Immutascan", "date":immutascanTradeDate, "tradevol24hr_usd": formatterCurrency.format(immutascanTradeVolume), "tradevol7day_usd":formatterCurrency.format(i_sevendayTradeVolume), "tradevol30day_usd":formatterCurrency.format(i_thirtydayTradeVolume)},
-      {"tracker": "Cr/Im", "date":date, "tradevol24hr_usd": pct24hrVolume, "tradevol7day_usd":pct7dayVolume, "tradevol30day_usd":pct30dayVolume}
+  //let temp7day = data.body["data"]["getMetricsAll"]["items"].slice(2,9)
+  //let temp30day = data.body["data"]["getMetricsAll"]["items"].slice(2,32)
+  //console.table(temp7day)
+
+  let i_sevendayTradeVolume = data.body["data"]["getMetricsAll"]["items"].slice(posfortoday,posfortoday+7).reduce((previous:any, current:any)=> previous+current.trade_volume_usd,0);
+  console.log ('Immutascan - 7 Day data: Volume of trades - ' + formatterCurrency.format(i_sevendayTradeVolume))
+  let i_sevendayTradeTrades = data.body["data"]["getMetricsAll"]["items"].slice(posfortoday,posfortoday+7).reduce((previous:any, current:any)=> previous+current.trade_count,0);
+  console.log ('Immutascan - 7 Day data: Number of trades - ' + formatterLargeNumber.format(i_sevendayTradeTrades))
+
+  //console.table(temp30day)
+  let i_thirtydayTradeVolume = data.body["data"]["getMetricsAll"]["items"].slice(posfortoday,posfortoday+30).reduce((previous:any, current:any)=> previous+current.trade_volume_usd,0);
+  console.log ('Immutascan - 30 Day data: Volume of trades - ' + formatterCurrency.format(i_thirtydayTradeVolume))
+  let i_thirtydayTradeTrades = data.body["data"]["getMetricsAll"]["items"].slice(posfortoday,posfortoday+30).reduce((previous:any, current:any)=> previous+current.trade_count,0);
+  console.log ('Immutascan - 30 Day data: Number of trades - ' + formatterLargeNumber.format(i_thirtydayTradeTrades))
+
+  console.log("Immutascan data retrieved")
+
+  console.log ('Daily summary - ' + date)
+  let pct24hrVolume = (c_twentyfourhourTradeVolume/i_twentyfourhourTradeVolume)-1
+  let pct7dayVolume = (c_sevendayTradeVolume/i_sevendayTradeVolume)-1
+  let pct30dayVolume = (c_thirtydayTradeVolume/i_thirtydayTradeVolume)-1
+
+  //Summary of 
+  let tradingData: { tracker: string, date: string, tradevol24hr_usd:string, tradevol7day_usd:string, tradevol30day_usd:string}[] = 
+  [
+    {"tracker": "Cryptoslam", "date":c_today.toISOString().split("T")[0], "tradevol24hr_usd": formatterCurrency.format(c_twentyfourhourTradeVolume), "tradevol7day_usd":formatterCurrency.format(c_sevendayTradeVolume), "tradevol30day_usd":formatterCurrency.format(c_thirtydayTradeVolume)},
+    {"tracker": "Immutascan", "date":immutascanTradeDate.toISOString().split("T")[0], "tradevol24hr_usd": formatterCurrency.format(i_twentyfourhourTradeVolume), "tradevol7day_usd":formatterCurrency.format(i_sevendayTradeVolume), "tradevol30day_usd":formatterCurrency.format(i_thirtydayTradeVolume)},
+    {"tracker": "Cr/Im", "date":date, "tradevol24hr_usd": formatterPercentage.format(pct24hrVolume), "tradevol7day_usd":formatterPercentage.format(pct7dayVolume), "tradevol30day_usd":formatterPercentage.format(pct30dayVolume)}
+  ]
+  console.table(tradingData);
+
+  //Output for slack message
+  console.log(`Quick data check (Cryptoslam v Immutascan)`)			
+  console.log(`Last 24 hours (Rank 3) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}})`)
+  console.log(`Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)})`)
+  console.log(`Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)})`)
+  console.log ()
+  console.log (`Error rate ` + formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume))))
+
+  //Post to Slack
+  //upload screenshot first
+  //example - curl -F file=@dramacat.gif -F "initial_comment=Shakes the cat" -F channels=C024BE91L,D032AC32T -H "Authorization: Bearer xoxb-xxxxxxxxx-xxxx" https://slack.com/api/files.upload
+
+  //#deal-cryptoslam - https://hooks.slack.com/services/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
+  //#ecosytem team - https://hooks.slack.com/services/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
+  //Example curl -X POST -H 'Content-type: application/json' --data '{"text":"Hello, World!"}' https://hooks.slack.com/services/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
+
+  console.log("Posting to Slack...")
+  const bodybuilding = `{
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "Quick data check (Cryptoslam v Immutascan)
+• Last 24 hours (Rank 3) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
+• Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
+• Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+          
+Error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
+        }
+      }
     ]
-    console.table(tradingData);
-    
+  }
+  `
+  //console.log('Export body:' + bodybuilding)
+  const slackresponse: any = await gotScraping('https://hooks.slack.com/services/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', {
+    // we are expecting a JSON response back
+    responseType: 'text',
+    // we must use a post request
+    method: 'POST',
+    // this is where we pass in our token
+    headers: { 'Content-Type': 'application/json' },
+    // here is our query with our variables
+    body: bodybuilding,
+  }).catch(function(e) {
+    console.log('Error thrown')
+    console.log(e.body)
+  });
+  console.log('Slack message posted - ' + slackresponse.body)
 
 
 })();
