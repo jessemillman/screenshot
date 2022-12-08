@@ -68,7 +68,7 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
   const screenshotPath = "img/cryptoslam - "+ date + ".png";
   // selectors
   const tableSelector =
-    ".css-18bewgf";
+    ".css-18bewgf > div:nth-child(1)";
    const sevenDaySelector =
     "div.css-nybhst:nth-child(2) > p:nth-child(1)";
   const thirtyDaySelector =
@@ -388,8 +388,16 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
 • Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
 • Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
           
-Error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
+Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
         }
+      },
+      {
+        "type": "image",
+        "title": {
+          "type": "plain_text",
+          "text": "Cryptoslam screenshot - ${date}"
+        },
+        "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg"
       }
     ]
   }
