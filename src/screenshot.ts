@@ -2,7 +2,6 @@ import * as puppeteer from "puppeteer";
 import { gql } from 'graphql-tag';
 import { gotScraping, MaxRedirectsError } from 'got-scraping';
 
-
 (async () => {
   
   const GET_LATEST = gql`
@@ -70,9 +69,9 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
   const tableSelector =
     ".css-18bewgf > div:nth-child(1)";
    const sevenDaySelector =
-    "div.css-nybhst:nth-child(2) > p:nth-child(1)";
+    "div.css-1hkzn7e:nth-child(2) > p:nth-child(1)";
   const thirtyDaySelector =
-    "div.css-nybhst:nth-child(3) > p:nth-child(1)";
+    "div.css-1hkzn7e:nth-child(3) > p:nth-child(1)";
   const dayTableSelector =
     ".css-18bewgf > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(2)";
   const sevenDayTableSelector =
@@ -179,6 +178,8 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
   //console.table(datatwentyfourhr)
   datatwentyfourhr = datatwentyfourhr.filter((item) => item[0]);
   let numofeleements = datatwentyfourhr.findIndex(isCurrency)
+  let twentyfourhourranking  = datatwentyfourhr.findIndex((value) => value.toString() === "ImmutableX")+ 1
+  console.log ('24Hr ranking - ' + twentyfourhourranking)
   console.log ('First currency value found at ' + numofeleements)
   let twentyfourHourTradingData: { chain: string, tradevol: string}[] = []
   let i: number = 0
@@ -228,6 +229,9 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
   //console.table(dataSevenDay)
 
   numofeleements = dataSevenDay.findIndex(isCurrency)
+  let sevendayranking = dataSevenDay.findIndex((value) => value.toString() === "ImmutableX") +1
+  console.log ('7 Day ranking - ' + sevendayranking)
+  
   console.log ('First currency value found at ' + numofeleements)
   let sevenDayTradingData: { chain: string, tradevol: string}[] = []
   i=0;
@@ -267,7 +271,9 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
   dataThirtyDay = dataThirtyDay[0].map((_, colIndex) => dataThirtyDay.map(row => row[colIndex]));
   dataThirtyDay = dataThirtyDay.filter((item) => item[0]);
   //console.table(dataThirtyDay)
-
+  let thirtydayranking = dataThirtyDay.findIndex((value) => value.toString() === "ImmutableX") +1
+  console.log ('30 Day ranking - ' + thirtydayranking)
+  
   numofeleements = dataThirtyDay.findIndex(isCurrency)
   console.log ('First currency value found at ' + numofeleements)
   let thirtyDayTradingData: { chain: string, tradevol: string}[] = []
@@ -362,9 +368,9 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
 
   //Output for slack message
   console.log(`Quick data check (Cryptoslam v Immutascan)`)			
-  console.log(`Last 24 hours (Rank 3) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}})`)
-  console.log(`Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)})`)
-  console.log(`Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)})`)
+  console.log(`Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}})`)
+  console.log(`Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)})`)
+  console.log(`Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)})`)
   console.log ()
   console.log (`Error rate ` + formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume))))
 
@@ -384,9 +390,9 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
         "text": {
           "type": "mrkdwn",
           "text": "Quick data check (Cryptoslam v Immutascan)
-• Last 24 hours (Rank 3) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
-• Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
-• Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+• Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
+• Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
+• Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
           
 Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
         }
@@ -397,12 +403,13 @@ Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Ma
           "type": "plain_text",
           "text": "Cryptoslam screenshot - ${date}"
         },
-        "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg"
+        "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
+        "alt_text": "Cryptoslam screenshot - ${date}"
       }
     ]
   }
   `
-  //console.log('Export body:' + bodybuilding)
+  console.log('Export body:' + bodybuilding)
   const slackresponse: any = await gotScraping('https://hooks.slack.com/services/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', {
     // we are expecting a JSON response back
     responseType: 'text',
@@ -417,7 +424,6 @@ Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Ma
     console.log(e.body)
   });
   console.log('Slack message posted - ' + slackresponse.body)
-
 
 })();
 
