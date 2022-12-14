@@ -8,4 +8,7 @@ Use node v16+, and install dependancies with `npm i `
 
 ## Run
 
-`npm run-script screenshot` to execute the app.
+`npx ts-node ./src/screenshot.ts` to execute the app.
+
+## Docker Build
+`docker build --platform linux/amd64 -t crypto-tracker .` to build image

@@ -4,6 +4,14 @@ import * as aws from 'aws-sdk';
 import * as puppeteer from "puppeteer";
 import { gql } from 'graphql-tag';
 import { gotScraping, MaxRedirectsError } from 'got-scraping';
+import './utils/env';
+
+const { App } = require('@slack/bolt');
+
+const slackapp = new App({
+    token: process.env.SLACK_BOT_TOKEN,
+    signingSecret: process.env.SLACK_SIGNING_SECRET
+  });
 
 export const lambdaHandler = async(event: any, context: Context) => {
     let attempt = 0;
@@ -41,12 +49,6 @@ export const lambdaHandler = async(event: any, context: Context) => {
                 maximumFractionDigits: 2
             })
 
-            function isCurrency(element: any)
-            {
-                let regex = /(?=.*?\d)^\$?(([1-9]\d{0,2}(,\d{3})*)|\d+)?(\.\d{1,2})?$/;
-                return regex.test(element);
-            }
-
             //console.log ('Test ' + isCurrency ("$1,199,692"))
             
             const variables = { address: "global" }
@@ -65,6 +67,8 @@ export const lambdaHandler = async(event: any, context: Context) => {
                 lastmonthdatestring = lastmonthdate.toISOString().split("T")[0];
             }
             const browser = await puppeteer.launch({
+                //use the installed browser instead of Puppeteer's built in one
+                executablePath: '/usr/bin/google-chrome',
                 defaultViewport: { width: 1920, height: 1080 }, // set browser size (this is the default for testing)
                 //Uncomment if you need to visually see what puppeteer is doing
                 //headless:false,
@@ -76,9 +80,9 @@ export const lambdaHandler = async(event: any, context: Context) => {
             const tableSelector =
                 ".css-18bewgf > div:nth-child(1)";
             const sevenDaySelector =
-                "div.css-nybhst:nth-child(2) > p:nth-child(1)";
+                "div.css-1hkzn7e:nth-child(2) > p:nth-child(1)";
             const thirtyDaySelector =
-                "div.css-nybhst:nth-child(3) > p:nth-child(1)";
+                "div.css-1hkzn7e:nth-child(3) > p:nth-child(1)";
             const dayTableSelector =
                 ".css-18bewgf > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(2)";
             const sevenDayTableSelector =
@@ -118,26 +122,11 @@ export const lambdaHandler = async(event: any, context: Context) => {
             const table = await page.$(tableSelector); // get the table
 
             console.log("Take screenshot...")
-            const screenshot = await table?.screenshot({
+            await table?.screenshot({
                 path: screenshotPath,
-            }) as Buffer;
+            });
             console.log("Screenshot saved to: ./" + screenshotPath);
 
-            //Save screenshot to the S3 bucket. Still unsure "where" it is going
-            /*
-            const s3 = new aws.S3();
-            const key = `screenshots/${context.awsRequestId}.png`;
-            console.log(`Screenshot location: ${event.bucketName}/${key}`);
-            await s3.putObject({
-            Bucket: event.bucketName,
-            Key: key,
-            Body: screenshot,
-            ContentType: 'image'
-            }).promise();
-
-            */
-            //Need to store path of where screenshot is going
-            const screenshotlink = "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg" //placeholder url
             console.log("Getting Cryptoslam data...")
 
             console.log('Opening page: ' + thisMonthDailyUrl)
@@ -200,6 +189,8 @@ export const lambdaHandler = async(event: any, context: Context) => {
             //console.table(datatwentyfourhr)
             datatwentyfourhr = datatwentyfourhr.filter((item) => item[0]);
             let numofeleements = datatwentyfourhr.findIndex(isCurrency)
+            let twentyfourhourranking  = datatwentyfourhr.findIndex((value) => value.toString() === "ImmutableX")+ 1
+            console.log ('24Hr ranking - ' + twentyfourhourranking)
             console.log ('First currency value found at ' + numofeleements)
             let twentyfourHourTradingData: { chain: string, tradevol: string}[] = []
             let i: number = 0
@@ -249,6 +240,9 @@ export const lambdaHandler = async(event: any, context: Context) => {
             //console.table(dataSevenDay)
 
             numofeleements = dataSevenDay.findIndex(isCurrency)
+            let sevendayranking = dataSevenDay.findIndex((value) => value.toString() === "ImmutableX") +1
+            console.log ('7 Day ranking - ' + sevendayranking)
+            
             console.log ('First currency value found at ' + numofeleements)
             let sevenDayTradingData: { chain: string, tradevol: string}[] = []
             i=0;
@@ -288,7 +282,9 @@ export const lambdaHandler = async(event: any, context: Context) => {
             dataThirtyDay = dataThirtyDay[0].map((_, colIndex) => dataThirtyDay.map(row => row[colIndex]));
             dataThirtyDay = dataThirtyDay.filter((item) => item[0]);
             //console.table(dataThirtyDay)
-
+            let thirtydayranking = dataThirtyDay.findIndex((value) => value.toString() === "ImmutableX") +1
+            console.log ('30 Day ranking - ' + thirtydayranking)
+            
             numofeleements = dataThirtyDay.findIndex(isCurrency)
             console.log ('First currency value found at ' + numofeleements)
             let thirtyDayTradingData: { chain: string, tradevol: string}[] = []
@@ -345,7 +341,7 @@ export const lambdaHandler = async(event: any, context: Context) => {
             // get the item at index[1] so its the second latest (i.e. yesterday)
             let immutascanTradeDate = new Date(data.body["data"]["getMetricsAll"]["items"][posfortoday]["type"]);
 
-            if (immutascanTradeDate==now) posfortoday +=1
+            if (now.getUTCHours() < 10) posfortoday +=1
 
             let i_twentyfourhourTradeVolume = data.body["data"]["getMetricsAll"]["items"][posfortoday]["trade_volume_usd"];
             console.log("Immutascan trade volume: " + formatterCurrency.format(i_twentyfourhourTradeVolume) + " on: " + immutascanTradeDate)
@@ -383,9 +379,9 @@ export const lambdaHandler = async(event: any, context: Context) => {
 
             //Output for slack message
             console.log(`Quick data check (Cryptoslam v Immutascan)`)			
-            console.log(`Last 24 hours (Rank 3) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}})`)
-            console.log(`Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)})`)
-            console.log(`Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)})`)
+            console.log(`Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}})`)
+            console.log(`Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)})`)
+            console.log(`Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)})`)
             console.log ()
             console.log (`Error rate ` + formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume))))
 
@@ -396,9 +392,44 @@ export const lambdaHandler = async(event: any, context: Context) => {
             //#deal-cryptoslam - https://hooks.slack.com/services/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
             //#ecosytem team - https://hooks.slack.com/services/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
             //Example curl -X POST -H 'Content-type: application/json' --data '{"text":"Hello, World!"}' https://hooks.slack.com/services/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
-            //Example file upload curl -F file=@dramacat.gif -F "initial_comment=Shakes the cat" -F channels=C024BE91L,D032AC32T -H "Authorization: Bearer xoxb-xxxxxxxxx-xxxx" https://slack.com/api/files.upload
-            
+
             console.log("Posting to Slack...")
+            
+            /*
+            //insert the below to add an image URL
+            ,
+                {
+                    "type": "image",
+                    "title": {
+                    "type": "plain_text",
+                    "text": "Cryptoslam screenshot - ${date}"
+                    },
+                    "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
+                    "alt_text": "Cryptoslam screenshot - ${date}"
+                }
+            */
+            console.log('Export body:' + bodybuilding)
+
+            //Slack SDK push to post message and upload file
+            await slackapp.start();
+            await slackapp.say({
+                blocks: [
+                {
+                    "type": "section",
+                    "text": {
+                    "type": "mrkdwn",
+                    "text": `"Quick data check (Cryptoslam v Immutascan)
+• Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
+• Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
+• Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+
+Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"`
+                    }
+                }
+                ]
+            })
+            await slackapp.file
+
             const bodybuilding = `{
                 "blocks": [
                 {
@@ -406,25 +437,17 @@ export const lambdaHandler = async(event: any, context: Context) => {
                     "text": {
                     "type": "mrkdwn",
                     "text": "Quick data check (Cryptoslam v Immutascan)
-• Last 24 hours (Rank 3) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
-• Last 7 days   (Rank 3) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
-• Last 30 days  (Rank 3) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+• Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
+• Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
+• Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+
 Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
                     }
-                },
-                {
-                    "type": "image",
-                    "title": {
-                    "type": "plain_text",
-                    "text": "Cryptoslam screenshot - ${date}"
-                    },
-                    "image_url": "${(screenshotlink}",
-			        "alt_text": "Cryptoslam screenshot - ${date}"
                 }
                 ]
             }
             `
-            //console.log('Export body:' + bodybuilding)
+            //webhook push to post message
             const slackresponse: any = await gotScraping('https://hooks.slack.com/services/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', {
                 // we are expecting a JSON response back
                 responseType: 'text',
@@ -439,14 +462,9 @@ Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Ma
                 console.log(e.body)
             });
             console.log('Slack message posted - ' + slackresponse.body)
-
-
-        
-        
-        
         return {
           statusCode: 200,
-          body: key
+          body: screenshotPath
         }
       } catch (err) {
         console.log('Error:', err);
@@ -492,6 +510,12 @@ async function getDailyTableData(
   });
 
   return data;
+}
+
+function isCurrency(element: any)
+{
+    let regex = /(?=.*?\d)^\$?(([1-9]\d{0,2}(,\d{3})*)|\d+)?(\.\d{1,2})?$/;
+    return regex.test(element);
 }
 
 function delay(time: number) {

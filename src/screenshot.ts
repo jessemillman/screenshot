@@ -330,7 +330,7 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
   // get the item at index[1] so its the second latest (i.e. yesterday)
   let immutascanTradeDate = new Date(data.body["data"]["getMetricsAll"]["items"][posfortoday]["type"]);
 
-  if (immutascanTradeDate==now) posfortoday +=1
+  if (now.getUTCHours() < 10) posfortoday +=1
 
   let i_twentyfourhourTradeVolume = data.body["data"]["getMetricsAll"]["items"][posfortoday]["trade_volume_usd"];
   console.log("Immutascan trade volume: " + formatterCurrency.format(i_twentyfourhourTradeVolume) + " on: " + immutascanTradeDate)
@@ -396,7 +396,13 @@ import { gotScraping, MaxRedirectsError } from 'got-scraping';
           
 Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
         }
-      },
+      }
+    ]
+  }
+  `
+  /*
+  //insert the below to add an image URL
+  ,
       {
         "type": "image",
         "title": {
@@ -406,9 +412,7 @@ Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Ma
         "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
         "alt_text": "Cryptoslam screenshot - ${date}"
       }
-    ]
-  }
-  `
+  */
   console.log('Export body:' + bodybuilding)
   const slackresponse: any = await gotScraping('https://hooks.slack.com/services/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', {
     // we are expecting a JSON response back
