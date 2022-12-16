@@ -8,7 +8,11 @@ Use node v16+, and install dependancies with `npm i `
 
 ## Run
 
-`npx ts-node ./src/screenshot.ts` to execute the app.
+`npx ts-node ./src/lambda-scraper.ts` to execute the app.
 
 ## Docker Build
 `docker build --platform linux/amd64 -t crypto-tracker .` to build image
+
+
+## Docker Run
+`docker run -dp 3000:3000 --platform linux/amd64 crypto-tracker` to run docker container
