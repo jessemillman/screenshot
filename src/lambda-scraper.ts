@@ -416,7 +416,7 @@ Max error rate ${formatterPercentage.format(maxpctError)}`
                 filename: "cryptoslam - "+ date + ".png",
                 // Note that channels still works but going with channel_id="C12345" is recommended.
                 // channels="C111,C222" is no longer supported. In this case, an exception will be thrown 
-                channel_id: 'C04B1PCTXEH', //C03AT6FF1GQ
+                channel_id: 'C03AT6FF1GQ', //prod - C03AT6FF1GQ // testing - C04B1PCTXEH
                 initial_comment: summarymsg,
                 title: 'Cryptoslam data check - ' + date
               });
@@ -431,7 +431,7 @@ Max error rate ${formatterPercentage.format(maxpctError)}`
                     filename: "cryptoslam - "+ date + ".png",
                     // Note that channels still works but going with channel_id="C12345" is recommended.
                     // channels="C111,C222" is no longer supported. In this case, an exception will be thrown 
-                    channel_id: 'C03AT6FF1GQ', //prod - C03AT6FF1GQ // testing - C03NCT02NLC
+                    channel_id: 'C03NCT02NLC', 
                     initial_comment: summarymsg,
                     title: 'Cryptoslam data check - ' + date
                   });
