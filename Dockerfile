@@ -16,7 +16,10 @@ RUN apt-get update && apt-get install gnupg wget -y && \
   rm -rf /var/lib/apt/lists/*
 
 # Install your app here...
-RUN yarn install --production
+COPY ["package.json", "package-lock.json*", "./"]
+
+RUN npm install --production
+#RUN yarn install --production
 #RUN chmod -R o+rwx node_modules/puppeteer/.local-chromium
 
 CMD ["npx", "ts-node", "./src/lambda-scraper.ts"]

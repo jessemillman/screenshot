@@ -1,20 +1,19 @@
 
-import { Context } from 'aws-lambda';
-import * as aws from 'aws-sdk';
+//import { Context } from 'aws-lambda';
+//import * as aws from 'aws-sdk';
 import * as puppeteer from "puppeteer";
 import { gql } from 'graphql-tag';
 import { gotScraping, MaxRedirectsError } from 'got-scraping';
 import './utils/env';
+import { WebClient } from '@slack/web-api';
 
-const { App } = require('@slack/bolt');
+const token = process.env.SLACK_TOKEN;
+const web = new WebClient(token);
 
-const slackapp = new App({
-    token: process.env.SLACK_BOT_TOKEN,
-    signingSecret: process.env.SLACK_SIGNING_SECRET
-  });
-
-export const lambdaHandler = async(event: any, context: Context) => {
-    let attempt = 0;
+//export const lambdaHandler = async(event: any, context: Context) => {
+ 
+(async () => {
+       let attempt = 0;
     do {
       attempt++;
       try {
@@ -68,7 +67,7 @@ export const lambdaHandler = async(event: any, context: Context) => {
             }
             const browser = await puppeteer.launch({
                 //use the installed browser instead of Puppeteer's built in one
-                executablePath: '/usr/bin/google-chrome',
+                //executablePath: '/usr/bin/google-chrome',
                 defaultViewport: { width: 1920, height: 1080 }, // set browser size (this is the default for testing)
                 //Uncomment if you need to visually see what puppeteer is doing
                 //headless:false,
@@ -364,9 +363,10 @@ export const lambdaHandler = async(event: any, context: Context) => {
             console.log("Immutascan data retrieved")
 
             console.log ('Daily summary - ' + date)
-            let pct24hrVolume = (c_twentyfourhourTradeVolume/i_twentyfourhourTradeVolume)-1
-            let pct7dayVolume = (c_sevendayTradeVolume/i_sevendayTradeVolume)-1
-            let pct30dayVolume = (c_thirtydayTradeVolume/i_thirtydayTradeVolume)-1
+            const pct24hrVolume = (c_twentyfourhourTradeVolume/i_twentyfourhourTradeVolume)-1
+            const pct7dayVolume = (c_sevendayTradeVolume/i_sevendayTradeVolume)-1
+            const pct30dayVolume = (c_thirtydayTradeVolume/i_thirtydayTradeVolume)-1
+            const maxpctError = Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume))
 
             //Summary of 
             let tradingData: { tracker: string, date: string, tradevol24hr_usd:string, tradevol7day_usd:string, tradevol30day_usd:string}[] = 
@@ -383,7 +383,14 @@ export const lambdaHandler = async(event: any, context: Context) => {
             console.log(`Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)})`)
             console.log(`Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)})`)
             console.log ()
-            console.log (`Error rate ` + formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume))))
+            console.log (`Error rate ` + formatterPercentage.format(maxpctError))
+            
+            const summarymsg = `Quick data check (Cryptoslam v Immutascan)
+• Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
+• Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
+• Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+
+Max error rate ${formatterPercentage.format(maxpctError)}`
 
             //Post to Slack
             //upload screenshot first
@@ -394,42 +401,45 @@ export const lambdaHandler = async(event: any, context: Context) => {
             //Example curl -X POST -H 'Content-type: application/json' --data '{"text":"Hello, World!"}' https://hooks.slack.com/services/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
 
             console.log("Posting to Slack...")
-            
-            /*
-            //insert the below to add an image URL
-            ,
-                {
-                    "type": "image",
-                    "title": {
-                    "type": "plain_text",
-                    "text": "Cryptoslam screenshot - ${date}"
-                    },
-                    "image_url": "https://assets3.thrillist.com/v1/image/1682388/size/tl-horizontal_main.jpg",
-                    "alt_text": "Cryptoslam screenshot - ${date}"
-                }
-            */
-            console.log('Export body:' + bodybuilding)
 
             //Slack SDK push to post message and upload file
-            await slackapp.start();
-            await slackapp.say({
-                blocks: [
-                {
-                    "type": "section",
-                    "text": {
-                    "type": "mrkdwn",
-                    "text": `"Quick data check (Cryptoslam v Immutascan)
-• Last 24 hours (Rank ${twentyfourhourranking}) -  ${formatterCurrency.format(c_twentyfourhourTradeVolume)} v  ${formatterCurrency.format(i_twentyfourhourTradeVolume)} (${formatterPercentage.format(pct24hrVolume)}) 
-• Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
-• Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
+            //#ecosystem-team - C04B1PCTXEH
+            //#wg-imx-user-rewards - C03NCT02NLC
+            //#deal-cryptoslam - C03AT6FF1GQ
+            
+            console.log('Check Slack auth')
+            console.log (await web.auth.test())
+            
+            console.log ('Check Slack token length - ' + web.token?.length)
+            const resultSlackUpload = await web.files.uploadV2({
+                file: screenshotPath,  // also accepts Buffer or ReadStream
+                filename: "cryptoslam - "+ date + ".png",
+                // Note that channels still works but going with channel_id="C12345" is recommended.
+                // channels="C111,C222" is no longer supported. In this case, an exception will be thrown 
+                channel_id: 'C04B1PCTXEH', //C03AT6FF1GQ
+                initial_comment: summarymsg,
+                title: 'Cryptoslam data check - ' + date
+              });
+            // `result may contain multiple files uploaded
+            console.log('File(s) uploaded: ', resultSlackUpload.files);
 
-Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"`
-                    }
+            
+            //posting to WG rewards channel
+            if (maxpctError > 0.5) { //0.5
+                const resultSlackUpload2 = await web.files.uploadV2({
+                    file: screenshotPath,  // also accepts Buffer or ReadStream
+                    filename: "cryptoslam - "+ date + ".png",
+                    // Note that channels still works but going with channel_id="C12345" is recommended.
+                    // channels="C111,C222" is no longer supported. In this case, an exception will be thrown 
+                    channel_id: 'C03AT6FF1GQ', //prod - C03AT6FF1GQ // testing - C03NCT02NLC
+                    initial_comment: summarymsg,
+                    title: 'Cryptoslam data check - ' + date
+                  });
+                  console.log('File(s) uploaded: ', resultSlackUpload2.files);
                 }
-                ]
-            })
-            await slackapp.file
-
+            
+/*
+//Back-up approach Posting via Slack webhooks. No file upload
             const bodybuilding = `{
                 "blocks": [
                 {
@@ -441,14 +451,17 @@ Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Ma
 • Last 7 days   (Rank ${sevendayranking}) -  ${formatterCurrency.format(c_sevendayTradeVolume)} v  ${formatterCurrency.format(i_sevendayTradeVolume)} (${formatterPercentage.format(pct7dayVolume)}) 
 • Last 30 days  (Rank ${thirtydayranking}) - ${formatterCurrency.format(c_thirtydayTradeVolume)} v ${formatterCurrency.format(i_thirtydayTradeVolume)} (${formatterPercentage.format(pct30dayVolume)}) 
 
-Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Math.abs(pct7dayVolume), Math.abs(pct30dayVolume)))}"
+Max error rate ${formatterPercentage.format(maxpctError)}"
                     }
                 }
                 ]
             }
-            `
+            `*/
+            /*
+            console.log('Export body:' + bodybuilding)
             //webhook push to post message
-            const slackresponse: any = await gotScraping('https://hooks.slack.com/services/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', {
+            //posting to ecosystem team channel
+            const slackresponse1: any = await gotScraping('https://hooks.slack.com/services/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', {
                 // we are expecting a JSON response back
                 responseType: 'text',
                 // we must use a post request
@@ -461,25 +474,60 @@ Max error rate ${formatterPercentage.format(Math.max(Math.abs(pct24hrVolume), Ma
                 console.log('Error thrown')
                 console.log(e.body)
             });
-            console.log('Slack message posted - ' + slackresponse.body)
+            console.log('Slack message posted - ' + slackresponse1.statusCode)
+            
+            //posting to cryptoslam deal channel
+            const slackresponse2: any = await gotScraping('https://hooks.slack.com/services/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', {
+                // we are expecting a JSON response back
+                responseType: 'text',
+                // we must use a post request
+                method: 'POST',
+                // this is where we pass in our token
+                headers: { 'Content-Type': 'application/json' },
+                // here is our query with our variables
+                body: bodybuilding,
+            }).catch(function(e) {
+                console.log('Error thrown')
+                console.log(e.body)
+            });
+            console.log('Slack message posted - ' + slackresponse2.statusCode)
+
+            //posting to WG rewards channel
+            if (maxpctError > 0.05) {
+                const slackresponse3: any = await gotScraping('https://hooks.slack.com/services/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', {
+                    // we are expecting a JSON response back
+                    responseType: 'text',
+                    // we must use a post request
+                    method: 'POST',
+                    // this is where we pass in our token
+                    headers: { 'Content-Type': 'application/json' },
+                    // here is our query with our variables
+                    body: bodybuilding,
+                }).catch(function(e) {
+                    console.log('Error thrown')
+                    console.log(e.body)
+                });
+            console.log('Slack message posted - ' + slackresponse3.statusCode)
+            }
+            */
         return {
           statusCode: 200,
           body: screenshotPath
         }
       } catch (err) {
         console.log('Error:', err);
-        if (attempt <= 3) {
+        if (attempt <= 1) {
           console.log('Trying again');
         }
       }
-    } while (attempt <= 3)
+    } while (attempt <= 1)
     
     return {
       statusCode: 400,
       body: 'Error'
     }
   
-};
+})();
 
 async function getTableData(
   page: puppeteer.Page,
