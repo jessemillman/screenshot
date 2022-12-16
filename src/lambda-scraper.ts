@@ -425,7 +425,7 @@ Max error rate ${formatterPercentage.format(maxpctError)}`
 
             
             //posting to WG rewards channel
-            if (maxpctError > 0.5) { //0.5
+            if (maxpctError > 0.05) { //prod 0.5 //test 1.0
                 const resultSlackUpload2 = await web.files.uploadV2({
                     file: screenshotPath,  // also accepts Buffer or ReadStream
                     filename: "cryptoslam - "+ date + ".png",
