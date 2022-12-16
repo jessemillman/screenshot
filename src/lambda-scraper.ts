@@ -416,7 +416,7 @@ Max error rate ${formatterPercentage.format(maxpctError)}`
                 filename: "cryptoslam - "+ date + ".png",
                 // Note that channels still works but going with channel_id="C12345" is recommended.
                 // channels="C111,C222" is no longer supported. In this case, an exception will be thrown 
-                channel_id: 'C03AT6FF1GQ', //prod - C03AT6FF1GQ // testing - C04B1PCTXEH
+                channel_id: 'C04B1PCTXEH', //prod - C03AT6FF1GQ // testing - C04B1PCTXEH
                 initial_comment: summarymsg,
                 title: 'Cryptoslam data check - ' + date
               });
@@ -425,7 +425,7 @@ Max error rate ${formatterPercentage.format(maxpctError)}`
 
             
             //posting to WG rewards channel
-            if (maxpctError > 0.05) { //prod 0.5 //test 1.0
+            if (maxpctError > 0.15) { //prod 0.5 //test 1.0
                 const resultSlackUpload2 = await web.files.uploadV2({
                     file: screenshotPath,  // also accepts Buffer or ReadStream
                     filename: "cryptoslam - "+ date + ".png",
